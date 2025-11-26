@@ -1,0 +1,148 @@
+#!/bin/bash
+#SBATCH --job-name=prepare_data
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=04:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/prepare_data_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/prepare_data_%j.err
+
+# =============================================================================
+# PURPOSE: Prepare all data from scratch for opro2 pipeline
+# =============================================================================
+# This job downloads datasets and generates experimental variants:
+#   1. Download VoxConverse audio (SPEECH samples)
+#   2. Download ESC-50 audio (NONSPEECH samples)
+#   3. Prepare base 1000ms clips with GroupShuffleSplit
+#   4. Generate experimental variants (duration x SNR)
+#
+# OUTPUT:
+#   data/processed/experimental_variants/
+#     - train_metadata.csv
+#     - dev_metadata.csv
+#     - test_metadata.csv
+#     - audio/{train,dev,test}/*.wav
+#
+# NEXT STEP:
+#   Run OPRO: sbatch slurm/opro_classic_base.job
+# =============================================================================
+
+set -euo pipefail
+set -x
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+
+echo "[INFO] Start: $(date)"
+echo "[INFO] Job ID: $SLURM_JOB_ID"
+echo "[INFO] Node: $SLURM_NODELIST"
+cd "$REPO"
+
+# Create logs directory
+mkdir -p "$REPO/logs"
+
+# =============================================================================
+# STEP 1: Download VoxConverse audio
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 1/4] Download VoxConverse audio"
+echo "============================================================================="
+
+VOXCONVERSE_DIR="$REPO/data/raw/voxconverse/audio/dev"
+if [ -d "$VOXCONVERSE_DIR" ] && [ $(ls -1 "$VOXCONVERSE_DIR"/*.wav 2>/dev/null | wc -l) -gt 0 ]; then
+    echo "[SKIP] VoxConverse audio already exists: $(ls -1 "$VOXCONVERSE_DIR"/*.wav | wc -l) files"
+else
+    echo "[RUN] Downloading VoxConverse..."
+    apptainer exec "$CONTAINER" python3 scripts/download_voxconverse_audio.py \
+        --data-root data/raw \
+        --splits dev \
+        --force-full
+fi
+
+# =============================================================================
+# STEP 2: Download ESC-50 audio
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 2/4] Download ESC-50 audio"
+echo "============================================================================="
+
+ESC50_DIR="$REPO/data/raw/esc50/audio"
+if [ -d "$ESC50_DIR" ] && [ $(ls -1 "$ESC50_DIR"/*.wav 2>/dev/null | wc -l) -gt 0 ]; then
+    echo "[SKIP] ESC-50 audio already exists: $(ls -1 "$ESC50_DIR"/*.wav | wc -l) files"
+else
+    echo "[RUN] Downloading ESC-50..."
+    apptainer exec "$CONTAINER" python3 scripts/download_esc50_audio.py \
+        --data-root data/raw
+fi
+
+# =============================================================================
+# STEP 3: Prepare base clips (1000ms)
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 3/4] Prepare base clips with GroupShuffleSplit"
+echo "============================================================================="
+
+BASE_CLIPS_DIR="$REPO/data/processed/base_1000ms"
+if [ -f "$BASE_CLIPS_DIR/train_base.csv" ]; then
+    echo "[SKIP] Base clips already exist"
+    ls -la "$BASE_CLIPS_DIR"/*.csv
+else
+    echo "[RUN] Preparing base clips..."
+    apptainer exec "$CONTAINER" python3 scripts/prepare_base_clips.py \
+        --voxconverse_dir data/raw/voxconverse/audio/dev \
+        --esc50_dir data/raw/esc50/audio \
+        --output_dir data/processed/base_1000ms \
+        --duration 1000 \
+        --train_size 64 \
+        --dev_size 72 \
+        --test_size 24 \
+        --seed 42
+fi
+
+# =============================================================================
+# STEP 4: Generate experimental variants (duration x SNR)
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 4/4] Generate experimental variants"
+echo "============================================================================="
+
+VARIANTS_DIR="$REPO/data/processed/experimental_variants"
+if [ -f "$VARIANTS_DIR/dev_metadata.csv" ]; then
+    echo "[SKIP] Experimental variants already exist"
+    ls -la "$VARIANTS_DIR"/*.csv
+else
+    echo "[RUN] Generating experimental variants..."
+    apptainer exec "$CONTAINER" python3 scripts/generate_experimental_variants.py \
+        --input_base data/processed/base_1000ms \
+        --output_dir data/processed/experimental_variants \
+        --durations 20 40 60 80 100 200 500 1000 \
+        --snr_levels -10 -5 0 5 10 20 \
+        --padding_duration 2000 \
+        --noise_amplitude 0.0001
+fi
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[DONE] Data preparation complete!"
+echo "============================================================================="
+echo ""
+echo "Generated files:"
+ls -la "$VARIANTS_DIR"/*.csv 2>/dev/null || echo "  (none)"
+echo ""
+echo "Audio directories:"
+du -sh "$VARIANTS_DIR/audio/"* 2>/dev/null || echo "  (none)"
+echo ""
+echo "End: $(date)"
+echo ""
+echo "============================================================================="
+echo "NEXT STEP: Run OPRO optimization"
+echo "============================================================================="
+echo "  sbatch slurm/opro_classic_base.job"
+echo ""
