@@ -312,7 +312,7 @@ def save_clips_and_metadata(df: pd.DataFrame, output_dir: Path, split_name: str,
         # Prepare metadata
         output_data.append({
             'clip_id': row['clip_id'],
-            'audio_path': str(output_path.relative_to(output_dir.parent.parent)),  # Relative to project root
+            'audio_path': str(output_path),  # Relative to project root (e.g., data/processed/...)
             'ground_truth': row['ground_truth'],
             'dataset': row['dataset'],
             'group_id': row.get('speaker_id', row.get('group_id')),

@@ -85,21 +85,22 @@ echo "[STEP 3/4] Prepare base clips with GroupShuffleSplit"
 echo "============================================================================="
 
 BASE_CLIPS_DIR="$REPO/data/processed/base_1000ms"
-if [ -f "$BASE_CLIPS_DIR/train_base.csv" ]; then
-    echo "[SKIP] Base clips already exist"
-    ls -la "$BASE_CLIPS_DIR"/*.csv
-else
-    echo "[RUN] Preparing base clips..."
-    apptainer exec "$CONTAINER" python3 scripts/prepare_base_clips.py \
-        --voxconverse_dir data/raw/voxconverse/audio/dev \
-        --esc50_dir data/raw/esc50/audio \
-        --output_dir data/processed/base_1000ms \
-        --duration 1000 \
-        --train_size 64 \
-        --dev_size 72 \
-        --test_size 24 \
-        --seed 42
+# Always regenerate to ensure correct paths
+if [ -d "$BASE_CLIPS_DIR" ]; then
+    echo "[CLEAN] Removing old base clips with potentially wrong paths..."
+    rm -rf "$BASE_CLIPS_DIR"
 fi
+
+echo "[RUN] Preparing base clips..."
+apptainer exec "$CONTAINER" python3 scripts/prepare_base_clips.py \
+    --voxconverse_dir data/raw/voxconverse/audio/dev \
+    --esc50_dir data/raw/esc50/audio \
+    --output_dir data/processed/base_1000ms \
+    --duration 1000 \
+    --train_size 64 \
+    --dev_size 72 \
+    --test_size 24 \
+    --seed 42
 
 # =============================================================================
 # STEP 4: Generate experimental variants (duration x SNR)
@@ -110,19 +111,20 @@ echo "[STEP 4/4] Generate experimental variants"
 echo "============================================================================="
 
 VARIANTS_DIR="$REPO/data/processed/experimental_variants"
-if [ -f "$VARIANTS_DIR/dev_metadata.csv" ]; then
-    echo "[SKIP] Experimental variants already exist"
-    ls -la "$VARIANTS_DIR"/*.csv
-else
-    echo "[RUN] Generating experimental variants..."
-    apptainer exec "$CONTAINER" python3 scripts/generate_experimental_variants.py \
-        --input_base data/processed/base_1000ms \
-        --output_dir data/processed/experimental_variants \
-        --durations 20 40 60 80 100 200 500 1000 \
-        --snr_levels -10 -5 0 5 10 20 \
-        --padding_duration 2000 \
-        --noise_amplitude 0.0001
+# Always regenerate to ensure correct paths
+if [ -d "$VARIANTS_DIR" ]; then
+    echo "[CLEAN] Removing old experimental variants with potentially wrong paths..."
+    rm -rf "$VARIANTS_DIR"
 fi
+
+echo "[RUN] Generating experimental variants..."
+apptainer exec "$CONTAINER" python3 scripts/generate_experimental_variants.py \
+    --input_base data/processed/base_1000ms \
+    --output_dir data/processed/experimental_variants \
+    --durations 20 40 60 80 100 200 500 1000 \
+    --snr_levels -10 -5 0 5 10 20 \
+    --padding_duration 2000 \
+    --noise_amplitude 0.0001
 
 # =============================================================================
 # SUMMARY

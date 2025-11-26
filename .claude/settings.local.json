@@ -64,7 +64,10 @@
       "Bash(\"Qwen2-Audio + LoRA + Optimized Prompt\" )",
       "Bash([ -f \"c:\\VS code projects\\OPRO Qwen\\.gitignore\" ])",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []

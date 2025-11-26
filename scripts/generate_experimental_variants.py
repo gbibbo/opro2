@@ -254,7 +254,7 @@ def generate_variants_for_split(base_csv: Path, output_dir: Path, split_name: st
                     'variant_id': variant_id,
                     'duration_ms': duration_ms,
                     'snr_db': snr_db,
-                    'audio_path': str(output_path.relative_to(output_dir.parent.parent)),
+                    'audio_path': str(output_path),  # Relative to project root
                     'ground_truth': row['ground_truth'],
                     'dataset': row['dataset'],
                     'group_id': row['group_id'],
