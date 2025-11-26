@@ -1,19 +1,24 @@
 #!/bin/bash
+# PURPOSE: Run OPRO prompt optimization on base Qwen2-Audio model (pipeline block E)
+# INPUTS: dev CSV manifest in data/processed/experimental_variants/
+# OUTPUTS: Best prompt in results/opro_base_v2/
+# CLUSTER: Requires GPU, run via sbatch
+
 #SBATCH --job-name=opro_base
 #SBATCH --partition=debug
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=03:00:00
-#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro/logs/opro_base_%j.out
-#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro/logs/opro_base_%j.err
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/opro_base_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/opro_base_%j.err
 
 # OPRO on BASE model (no fine-tuning)
 
 set -euo pipefail
 set -x
 
-REPO="/mnt/fast/nobackup/users/gb0048/opro"
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
 CONTAINER="$REPO/qwen_pipeline_v2.sif"
 
 echo "[INFO] Start: $(date)"

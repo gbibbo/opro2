@@ -1,17 +1,22 @@
 #!/bin/bash
+# PURPOSE: Train Qwen2-Audio with LoRA adapters (pipeline block F)
+# INPUTS: train/dev CSV manifests in data/processed/experimental_variants/
+# OUTPUTS: LoRA checkpoint in checkpoints/qwen_lora_seed42/
+# CLUSTER: Requires GPU, run via sbatch
+
 #SBATCH --job-name=train_qwen42
 #SBATCH --gres=gpu:1
 #SBATCH --constraint="gpu_3090|gpu_a5000|gpu_5000_ada"
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=64G
 #SBATCH --time=08:00:00
-#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro/logs/train_seed42_%j.out
-#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro/logs/train_seed42_%j.err
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/train_seed42_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/train_seed42_%j.err
 
 set -euo pipefail
 set -x
 
-REPO="/mnt/fast/nobackup/users/gb0048/opro"
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
 CONTAINER="$REPO/qwen_pipeline_v2.sif"
 
 echo "[INFO] Start: $(date)"

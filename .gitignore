@@ -196,3 +196,16 @@ docs/archive/
 
 # Windows error files
 nul
+
+# Slurm output files (keep in logs/ which is already gitignored)
+*.out
+*.err
+
+# Keep evaluation results for base and LoRA models
+!results/eval_base_thresh*/*.csv
+!results/eval_base_thresh*/*.json
+!results/eval_lora_thresh*/*.csv
+!results/eval_lora_thresh*/*.json
+
+# NOTE: legacy/ folder is tracked and should NOT be ignored
+# It contains archived code that may be useful for reference

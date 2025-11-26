@@ -1,17 +1,22 @@
 #!/bin/bash
+# PURPOSE: Quick test of prompts on dev subset (sanity check)
+# INPUTS: Dev CSV manifest, 50 samples per class
+# OUTPUTS: Stdout accuracy metrics
+# CLUSTER: Requires GPU, run via sbatch
+
 #SBATCH --job-name=test_prompts
 #SBATCH --partition=debug
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=01:00:00
-#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro/logs/test_prompts_%j.out
-#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro/logs/test_prompts_%j.err
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/test_prompts_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/test_prompts_%j.err
 
 set -euo pipefail
 set -x
 
-REPO="/mnt/fast/nobackup/users/gb0048/opro"
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
 CONTAINER="$REPO/qwen_pipeline_v2.sif"
 
 echo "[INFO] Start: $(date)"

@@ -2,30 +2,43 @@
 """
 OPRO Classic: Prompt Optimization with Local LLM
 
-This script restores the "classic" OPRO that was successful (>90% on dev set).
+PURPOSE:
+    Optimize prompts for Qwen2-Audio speech detection using OPRO algorithm.
+    Part of pipeline block E (OPRO on base model) and G (OPRO on fine-tuned model).
+
+INPUTS:
+    - Manifest parquet with audio paths and labels (conditions_manifest_split.parquet)
+    - Split name (dev for optimization, test for final eval)
+    - Optional: LoRA checkpoint path for fine-tuned model
+
+OUTPUTS:
+    - Best prompt JSON (best_prompt.json)
+    - Optimization history (opro_history.json)
+    - Per-iteration metrics
+
+CLUSTER vs LOCAL:
+    - Requires GPU (A100 recommended, 8GB+ VRAM for 4-bit quantization)
+    - Run via slurm/opro_classic_base.job or slurm/opro_classic_lora.job
 
 Key features:
 - Uses LOCAL LLM (Qwen2.5 / Qwen2-Audio / Llama) to generate prompts
-- Optimizes a composite reward: R = w_clip·BA_clip + w_cond·BA_cond - w_len·(len/100)
+- Optimizes reward: R = w_clip * BA_clip + w_cond * BA_conditions (NO length penalty)
 - Evaluates prompts with Qwen2-Audio-7B-Instruct (base or with LoRA)
-- Reuses working code from:
-  * opro_optimizer_local.py (core optimizer logic)
-  * run_opro_local_8gb_fixed.py (sanitization, circuit breaker)
-  * Qwen2AudioClassifier for evaluation
+- Includes robust prompt sanitization and circuit breaker for error handling
 
 Usage:
     # Base model (no fine-tuning)
-    python scripts/opro_classic_optimize.py \
-        --manifest data/processed/conditions_final/conditions_manifest_split.parquet \
-        --split dev \
-        --output_dir results/opro_classic \
+    python scripts/opro_classic_optimize.py \\
+        --manifest data/processed/conditions_final/conditions_manifest_split.parquet \\
+        --split dev \\
+        --output_dir results/opro_classic \\
         --no_lora
 
     # With LoRA checkpoint
-    python scripts/opro_classic_optimize.py \
-        --manifest data/processed/conditions_final/conditions_manifest_split.parquet \
-        --split dev \
-        --output_dir results/opro_classic_lora \
+    python scripts/opro_classic_optimize.py \\
+        --manifest data/processed/conditions_final/conditions_manifest_split.parquet \\
+        --split dev \\
+        --output_dir results/opro_classic_lora \\
         --checkpoint checkpoints/qwen_lora_seed42/final
 """
 
@@ -1147,7 +1160,7 @@ def main():
     parser.add_argument(
         "--reward_w_length_penalty",
         type=float,
-        default=0.05,
+        default=0.0,  # No prompt length penalty - reward based on performance only
     )
 
     # Baseline / initial prompts

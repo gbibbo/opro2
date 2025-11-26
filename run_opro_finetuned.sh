@@ -1,19 +1,24 @@
 #!/bin/bash
+# PURPOSE: Run OPRO prompt optimization on fine-tuned Qwen2-Audio model (pipeline block G)
+# INPUTS: LoRA checkpoint in checkpoints/, dev CSV manifest
+# OUTPUTS: Best prompt in results/opro_finetuned/
+# CLUSTER: Requires GPU, run via sbatch
+
 #SBATCH --job-name=opro_ft
 #SBATCH --partition=debug
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=03:00:00
-#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro/logs/opro_ft_%j.out
-#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro/logs/opro_ft_%j.err
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/opro_ft_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/opro_ft_%j.err
 
 # OPRO on FINE-TUNED model
 
 set -euo pipefail
 set -x
 
-REPO="/mnt/fast/nobackup/users/gb0048/opro"
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
 CONTAINER="$REPO/qwen_pipeline_v2.sif"
 
 echo "[INFO] Start: $(date)"
@@ -36,7 +41,7 @@ apptainer exec --nv \
   --env TRANSFORMERS_CACHE="$TRANSFORMERS_CACHE" \
   --env HF_HUB_CACHE="$HF_HUB_CACHE" \
   --env PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" \
-  "$CONTAINER" python3 scripts/opro_post_ft.py \
+  "$CONTAINER" python3 scripts/opro_post_ft_v2.py \
   --checkpoint "$CHECKPOINT" \
   --train_csv data/processed/experimental_variants/dev_metadata.csv \
   --output_dir results/opro_finetuned \

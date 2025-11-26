@@ -1,19 +1,24 @@
 #!/bin/bash
+# PURPOSE: Train Qwen2-Audio with augmented dataset (pipeline block F variant)
+# INPUTS: Augmented train/dev CSV in data/processed/augmented_dataset/
+# OUTPUTS: LoRA checkpoint in checkpoints/qwen_augmented_seed42/
+# CLUSTER: Requires GPU, run via sbatch
+
 #SBATCH --job-name=train_aug
 #SBATCH --partition=debug
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=08:00:00
-#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro/logs/train_aug_%j.out
-#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro/logs/train_aug_%j.err
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/train_aug_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/train_aug_%j.err
 
 # Train model with augmented dataset
 
 set -euo pipefail
 set -x
 
-REPO="/mnt/fast/nobackup/users/gb0048/opro"
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
 CONTAINER="$REPO/qwen_pipeline_v2.sif"
 
 echo "[INFO] Start: $(date)"

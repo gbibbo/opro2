@@ -2,15 +2,32 @@
 """
 OPRO Post Fine-Tuning: Prompt Optimization on Frozen Fine-Tuned Model (v2)
 
+PURPOSE:
+    Optimize prompts for fine-tuned Qwen2-Audio model (with LoRA adapters).
+    Part of pipeline block G (OPRO on fine-tuned model).
+
+INPUTS:
+    - Train/dev CSV with audio paths and labels
+    - LoRA checkpoint directory (or --no_lora for base model)
+
+OUTPUTS:
+    - Best prompt JSON (best_prompt.json)
+    - Optimization history (opro_history.json)
+
+CLUSTER vs LOCAL:
+    - Requires GPU with 8GB+ VRAM
+    - Run via slurm/opro_classic_lora.job
+
 This version uses Qwen2AudioClassifier (generation-based) instead of logit extraction.
 Based on evaluate_with_generation.py which is known to work correctly.
+Reward is based on accuracy only (NO length penalty).
 
 Usage:
-    python scripts/opro_post_ft_v2.py \
-        --no_lora \
-        --train_csv data/processed/experimental_variants/dev_metadata.csv \
-        --output_dir results/opro_base \
-        --num_iterations 15 \
+    python scripts/opro_post_ft_v2.py \\
+        --no_lora \\
+        --train_csv data/processed/experimental_variants/dev_metadata.csv \\
+        --output_dir results/opro_base \\
+        --num_iterations 15 \\
         --samples_per_iter 20
 """
 

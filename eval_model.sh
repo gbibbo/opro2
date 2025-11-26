@@ -1,12 +1,17 @@
 #!/bin/bash
+# PURPOSE: Evaluate Qwen2-Audio model on test set (pipeline block C/H)
+# INPUTS: Test CSV manifest, optional LoRA checkpoint
+# OUTPUTS: CSV predictions in results/
+# CLUSTER: Requires GPU, run via sbatch
+
 #SBATCH --job-name=eval_qwen
 #SBATCH --partition=debug
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
 #SBATCH --time=03:30:00
-#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro/logs/eval_%j.out
-#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro/logs/eval_%j.err
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/eval_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/eval_%j.err
 
 # Usage:
 #   Baseline (no LoRA):    sbatch eval_model.sh --no-lora
@@ -19,7 +24,7 @@
 set -euo pipefail
 set -x
 
-REPO="/mnt/fast/nobackup/users/gb0048/opro"
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
 CONTAINER="$REPO/qwen_pipeline_v2.sif"
 
 # Configurable via environment variables

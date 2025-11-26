@@ -15,7 +15,7 @@
 # This job runs the complete OPRO Classic optimization pipeline:
 # - Uses local LLM (Qwen2.5-7B-Instruct) to generate prompts
 # - Evaluates with Qwen2-Audio-7B-Instruct (base or LoRA)
-# - Optimizes composite reward: R = BA_clip + 0.25·BA_cond - 0.05·len/100
+# - Optimizes composite reward: R = BA_clip + 0.25·BA_cond (NO length penalty)
 # - Tracks 4 psychoacoustic metrics: duration, SNR, filter, reverb
 #
 # Usage:
