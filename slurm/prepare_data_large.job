@@ -1,0 +1,136 @@
+#!/bin/bash
+#SBATCH --job-name=prep_large
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48G
+#SBATCH --time=06:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/prepare_data_large_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/prepare_data_large_%j.err
+
+# =============================================================================
+# PURPOSE: Prepare LARGER dataset for LoRA fine-tuning
+# =============================================================================
+# This job uses more source data than prepare_data.job:
+#   - train_size: 200 clips (vs 64) → 9,600 training samples
+#   - dev_size: 100 clips (vs 72) → 4,800 dev samples
+#   - test_size: 50 clips (vs 24) → 2,400 test samples
+#
+# Total: 350 base clips × 48 variants = 16,800 samples
+# (vs previous 160 clips × 48 = 7,680 samples)
+#
+# OUTPUT:
+#   data/processed/experimental_variants_large/
+#     - train_metadata.csv (9,600 samples)
+#     - dev_metadata.csv (4,800 samples)
+#     - test_metadata.csv (2,400 samples)
+#     - audio/{train,dev,test}/*.wav
+# =============================================================================
+
+set -euo pipefail
+set -x
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+
+echo "[INFO] Start: $(date)"
+echo "[INFO] Job ID: $SLURM_JOB_ID"
+echo "[INFO] Node: $SLURM_NODELIST"
+cd "$REPO"
+
+mkdir -p "$REPO/logs"
+
+# =============================================================================
+# STEP 1: Verify raw data exists
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 1/3] Verify raw data"
+echo "============================================================================="
+
+VOXCONVERSE_DIR="$REPO/data/raw/voxconverse/audio/dev"
+ESC50_DIR="$REPO/data/raw/esc50/audio"
+
+if [ ! -d "$VOXCONVERSE_DIR" ] || [ $(ls -1 "$VOXCONVERSE_DIR"/*.wav 2>/dev/null | wc -l) -eq 0 ]; then
+    echo "[ERROR] VoxConverse audio not found. Run 'sbatch slurm/prepare_data.job' first."
+    exit 1
+fi
+
+if [ ! -d "$ESC50_DIR" ] || [ $(ls -1 "$ESC50_DIR"/*.wav 2>/dev/null | wc -l) -eq 0 ]; then
+    echo "[ERROR] ESC-50 audio not found. Run 'sbatch slurm/prepare_data.job' first."
+    exit 1
+fi
+
+echo "[OK] VoxConverse: $(ls -1 "$VOXCONVERSE_DIR"/*.wav | wc -l) files"
+echo "[OK] ESC-50: $(ls -1 "$ESC50_DIR"/*.wav | wc -l) files"
+
+# =============================================================================
+# STEP 2: Prepare LARGE base clips
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 2/3] Prepare LARGE base clips (200 train, 100 dev, 50 test)"
+echo "============================================================================="
+
+BASE_CLIPS_DIR="$REPO/data/processed/base_1000ms_large"
+if [ -d "$BASE_CLIPS_DIR" ]; then
+    echo "[CLEAN] Removing old base clips..."
+    rm -rf "$BASE_CLIPS_DIR"
+fi
+
+echo "[RUN] Preparing base clips (3x more than standard)..."
+apptainer exec "$CONTAINER" python3 scripts/prepare_base_clips.py \
+    --voxconverse_dir data/raw/voxconverse/audio/dev \
+    --esc50_dir data/raw/esc50/audio \
+    --output_dir data/processed/base_1000ms_large \
+    --duration 1000 \
+    --train_size 200 \
+    --dev_size 100 \
+    --test_size 50 \
+    --seed 42
+
+# =============================================================================
+# STEP 3: Generate experimental variants
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 3/3] Generate experimental variants (LARGE)"
+echo "============================================================================="
+
+VARIANTS_DIR="$REPO/data/processed/experimental_variants_large"
+if [ -d "$VARIANTS_DIR" ]; then
+    echo "[CLEAN] Removing old experimental variants..."
+    rm -rf "$VARIANTS_DIR"
+fi
+
+echo "[RUN] Generating experimental variants..."
+apptainer exec "$CONTAINER" python3 scripts/generate_experimental_variants.py \
+    --input_base data/processed/base_1000ms_large \
+    --output_dir data/processed/experimental_variants_large \
+    --durations 20 40 60 80 100 200 500 1000 \
+    --snr_levels -10 -5 0 5 10 20 \
+    --padding_duration 2000 \
+    --noise_amplitude 0.0001
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[DONE] LARGE data preparation complete!"
+echo "============================================================================="
+echo ""
+echo "Generated files:"
+ls -la "$VARIANTS_DIR"/*.csv 2>/dev/null || echo "  (none)"
+echo ""
+echo "Sample counts:"
+wc -l "$VARIANTS_DIR"/*.csv
+echo ""
+echo "Audio directories:"
+du -sh "$VARIANTS_DIR/audio/"* 2>/dev/null || echo "  (none)"
+echo ""
+echo "End: $(date)"
+echo ""
+echo "============================================================================="
+echo "NEXT STEP: Run LoRA training with large dataset"
+echo "============================================================================="
+echo "  sbatch slurm/train_lora_large.job"
+echo ""
