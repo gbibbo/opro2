@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=lora_large
-#SBATCH --gres=gpu:1
-#SBATCH --constraint="gpu_3090|gpu_a5000|gpu_5000_ada"
+#SBATCH --partition=3090
+#SBATCH --gpus=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=64G
 #SBATCH --time=12:00:00
