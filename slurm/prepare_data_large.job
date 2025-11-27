@@ -7,21 +7,28 @@
 #SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/prepare_data_large_%j.err
 
 # =============================================================================
-# PURPOSE: Prepare LARGER dataset for LoRA fine-tuning
+# PURPOSE: Prepare LARGE dataset with 4 INDEPENDENT psychoacoustic dimensions
 # =============================================================================
-# This job uses more source data than prepare_data.job:
-#   - train_size: 200 clips (vs 64) → 9,600 training samples
-#   - dev_size: 100 clips (vs 72) → 4,800 dev samples
-#   - test_size: 50 clips (vs 24) → 2,400 test samples
+# Dataset structure (22 variants per clip, NOT cross-products):
+#   - Duration: 8 values (20, 40, 60, 80, 100, 200, 500, 1000 ms)
+#   - SNR: 6 values (-10, -5, 0, 5, 10, 20 dB)
+#   - Reverb (T60): 4 values (none, 0.3s, 1.0s, 2.5s)
+#   - Filter: 4 values (none, bandpass, lowpass, highpass)
 #
-# Total: 350 base clips × 48 variants = 16,800 samples
-# (vs previous 160 clips × 48 = 7,680 samples)
+# Total conditions = 8 + 6 + 4 + 4 = 22 (NOT 768 cross-products!)
+#
+# Sizes:
+#   - train_size: 200 clips → 200 × 22 = 4,400 training samples
+#   - dev_size: 100 clips → 100 × 22 = 2,200 dev samples
+#   - test_size: 50 clips → 50 × 22 = 1,100 test samples
+#
+# Total: 350 base clips × 22 variants = 7,700 samples
 #
 # OUTPUT:
 #   data/processed/experimental_variants_large/
-#     - train_metadata.csv (9,600 samples)
-#     - dev_metadata.csv (4,800 samples)
-#     - test_metadata.csv (2,400 samples)
+#     - train_metadata.csv (4,400 samples)
+#     - dev_metadata.csv (2,200 samples)
+#     - test_metadata.csv (1,100 samples)
 #     - audio/{train,dev,test}/*.wav
 # =============================================================================
 
@@ -63,11 +70,31 @@ echo "[OK] VoxConverse: $(ls -1 "$VOXCONVERSE_DIR"/*.wav | wc -l) files"
 echo "[OK] ESC-50: $(ls -1 "$ESC50_DIR"/*.wav | wc -l) files"
 
 # =============================================================================
-# STEP 2: Prepare LARGE base clips
+# STEP 2: Download RIRs for reverb (OpenSLR SLR28)
 # =============================================================================
 echo ""
 echo "============================================================================="
-echo "[STEP 2/3] Prepare LARGE base clips (200 train, 100 dev, 50 test)"
+echo "[STEP 2/4] Download RIRs for reverb"
+echo "============================================================================="
+
+RIR_DIR="$REPO/data/rirs"
+if [ -f "$RIR_DIR/rir_metadata.json" ]; then
+    echo "[SKIP] RIRs already downloaded: $RIR_DIR"
+else
+    echo "[RUN] Downloading RIRs from OpenSLR..."
+    apptainer exec "$CONTAINER" python3 scripts/download_rirs.py \
+        --output_dir "$RIR_DIR"
+fi
+
+echo "[OK] RIR directory: $RIR_DIR"
+ls -la "$RIR_DIR"/*.json 2>/dev/null || echo "  (no metadata yet)"
+
+# =============================================================================
+# STEP 3: Prepare LARGE base clips
+# =============================================================================
+echo ""
+echo "============================================================================="
+echo "[STEP 3/4] Prepare LARGE base clips (200 train, 100 dev, 50 test)"
 echo "============================================================================="
 
 BASE_CLIPS_DIR="$REPO/data/processed/base_1000ms_large"
@@ -88,11 +115,11 @@ apptainer exec "$CONTAINER" python3 scripts/prepare_base_clips.py \
     --seed 42
 
 # =============================================================================
-# STEP 3: Generate experimental variants
+# STEP 4: Generate experimental variants (4 INDEPENDENT dimensions)
 # =============================================================================
 echo ""
 echo "============================================================================="
-echo "[STEP 3/3] Generate experimental variants (LARGE)"
+echo "[STEP 4/4] Generate experimental variants (4 INDEPENDENT dimensions)"
 echo "============================================================================="
 
 VARIANTS_DIR="$REPO/data/processed/experimental_variants_large"
@@ -101,22 +128,32 @@ if [ -d "$VARIANTS_DIR" ]; then
     rm -rf "$VARIANTS_DIR"
 fi
 
-echo "[RUN] Generating experimental variants..."
+echo "[RUN] Generating 22 independent variants per clip..."
+echo "  - Duration: 8 values (20-1000ms)"
+echo "  - SNR: 6 values (-10 to 20dB)"
+echo "  - Reverb: 4 values (none, 0.3s, 1.0s, 2.5s)"
+echo "  - Filter: 4 values (none, bandpass, lowpass, highpass)"
+
 apptainer exec "$CONTAINER" python3 scripts/generate_experimental_variants.py \
     --input_base data/processed/base_1000ms_large \
     --output_dir data/processed/experimental_variants_large \
     --durations 20 40 60 80 100 200 500 1000 \
     --snr_levels -10 -5 0 5 10 20 \
-    --padding_duration 2000 \
-    --noise_amplitude 0.0001
+    --t60_values 0.0 0.3 1.0 2.5 \
+    --filter_types none bandpass lowpass highpass \
+    --rir_dir "$RIR_DIR"
 
 # =============================================================================
 # SUMMARY
 # =============================================================================
 echo ""
 echo "============================================================================="
-echo "[DONE] LARGE data preparation complete!"
+echo "[DONE] LARGE data preparation complete (4 INDEPENDENT dimensions)!"
 echo "============================================================================="
+echo ""
+echo "Dataset structure:"
+echo "  - 22 variants per clip (8 dur + 6 snr + 4 reverb + 4 filter)"
+echo "  - NOT cross-products (would be 768 per clip)"
 echo ""
 echo "Generated files:"
 ls -la "$VARIANTS_DIR"/*.csv 2>/dev/null || echo "  (none)"

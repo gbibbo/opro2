@@ -943,7 +943,7 @@ def make_evaluator_fn(args, evaluator_model):
                 "n_samples": int(len(cond_df)),
             }
 
-        ba_conditions = float(np.mean(condition_bas)) if len(condition_bas) > 0 else 0.0
+        ba_conditions_old = float(np.mean(condition_bas)) if len(condition_bas) > 0 else 0.0
 
         # ------------------------------------------------------------------
         # 3) Helper para BA por columna (duración, SNR, filtro, reverb)
@@ -987,11 +987,34 @@ def make_evaluator_fn(args, evaluator_model):
         ba_reverb, reverb_metrics = compute_ba_by_column(results_df, "T60")
 
         # ------------------------------------------------------------------
-        # 5) Empaquetar todas las métricas en un dict
+        # 5) BA_conditions = promedio de las 4 dimensiones independientes
+        #    (NO combinaciones cruzadas)
+        # ------------------------------------------------------------------
+        dimension_bas = []
+        if duration_metrics:
+            dimension_bas.append(ba_duration)
+        if snr_metrics:
+            dimension_bas.append(ba_snr)
+        if filter_metrics:
+            dimension_bas.append(ba_filter)
+        if reverb_metrics:
+            dimension_bas.append(ba_reverb)
+
+        # Si tenemos al menos una dimensión, usamos el promedio de dimensiones
+        # Si no, fallback al cálculo antiguo por condiciones cruzadas
+        if dimension_bas:
+            ba_conditions = float(np.mean(dimension_bas))
+        else:
+            ba_conditions = ba_conditions_old
+
+        # ------------------------------------------------------------------
+        # 6) Empaquetar todas las métricas en un dict
         # ------------------------------------------------------------------
         metrics = {
             "ba_clip": float(ba_clip),
             "ba_conditions": float(ba_conditions),
+            "ba_conditions_old": float(ba_conditions_old),  # promedio condiciones cruzadas (deprecated)
+            "n_dimensions": len(dimension_bas),  # cuántas dimensiones se usaron
             "ba_duration": float(ba_duration),
             "ba_snr": float(ba_snr),
             "ba_filter": float(ba_filter),
