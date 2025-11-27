@@ -1,0 +1,88 @@
+#!/bin/bash
+#SBATCH --job-name=opro_22c
+#SBATCH --partition=3090
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48G
+#SBATCH --time=06:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/opro_base_22cond_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/opro_base_22cond_%j.err
+
+# =============================================================================
+# PURPOSE: OPRO on BASE model with 22 INDEPENDENT conditions
+# =============================================================================
+# Uses:
+#   - BASE Qwen2-Audio model (NO LoRA)
+#   - Data: experimental_variants_large (22 conditions: 8dur+6snr+4reverb+4filter)
+#   - Stratified sampling: 500 samples per evaluation
+#
+# This evaluates the base model on the correct 4-dimension dataset.
+# =============================================================================
+
+set -euo pipefail
+set -x
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+SEED=${1:-42}
+
+echo "[INFO] Start: $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv
+cd "$REPO"
+
+export HF_HOME="/mnt/fast/nobackup/users/gb0048/.cache/huggingface"
+export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+export HF_HUB_CACHE="$HF_HOME/hub"
+mkdir -p "$HF_HOME" "$TRANSFORMERS_CACHE" "$HF_HUB_CACHE"
+
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
+# Use 22-condition dataset
+MANIFEST="$REPO/data/processed/experimental_variants_large/dev_metadata.csv"
+if [ ! -f "$MANIFEST" ]; then
+    echo "[ERROR] Manifest not found: $MANIFEST"
+    echo "[ERROR] Run 'sbatch slurm/prepare_data_large.job' first"
+    exit 1
+fi
+
+echo "[INFO] Dataset: 22 independent conditions (8dur + 6snr + 4reverb + 4filter)"
+echo "[INFO] Manifest: $MANIFEST"
+echo "[INFO] Samples in manifest: $(wc -l < "$MANIFEST")"
+
+# Show dataset structure
+echo "[INFO] Dataset structure:"
+python3 -c "
+import pandas as pd
+df = pd.read_csv('$MANIFEST')
+print(f'  Total samples: {len(df)}')
+print(f'  Variant types: {df[\"variant_type\"].value_counts().to_dict()}')
+print(f'  Duration values: {sorted(df[\"duration_ms\"].dropna().unique().tolist())}')
+print(f'  SNR values: {sorted(df[\"snr_db\"].dropna().unique().tolist())}')
+print(f'  T60 values: {sorted(df[\"T60\"].dropna().unique().tolist())}')
+print(f'  Filter values: {sorted(df[\"band_filter\"].dropna().unique().tolist())}')
+"
+
+echo ""
+echo "[RUN] OPRO on BASE model (seed $SEED, 500 stratified samples)"
+apptainer exec --nv \
+  --pwd "$REPO" \
+  --env HF_HOME="$HF_HOME" \
+  --env TRANSFORMERS_CACHE="$TRANSFORMERS_CACHE" \
+  --env HF_HUB_CACHE="$HF_HUB_CACHE" \
+  --env PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" \
+  "$CONTAINER" python3 scripts/opro_classic_optimize.py \
+  --manifest "$MANIFEST" \
+  --split dev \
+  --output_dir results/opro_base_22cond_seed${SEED} \
+  --no_lora \
+  --optimizer_llm Qwen/Qwen2.5-7B-Instruct \
+  --num_iterations 30 \
+  --candidates_per_iter 3 \
+  --early_stopping 5 \
+  --max_eval_samples 500 \
+  --sample_strategy stratified \
+  --seed $SEED
+
+echo "[DONE] End: $(date)"
+echo "Results: results/opro_base_22cond_seed${SEED}/"
+cat results/opro_base_22cond_seed${SEED}/best_prompt.txt 2>/dev/null || echo "(no best prompt yet)"
