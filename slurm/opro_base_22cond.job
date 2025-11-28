@@ -51,15 +51,11 @@ echo "[INFO] Samples in manifest: $(wc -l < "$MANIFEST")"
 
 # Show dataset structure
 echo "[INFO] Dataset structure:"
-python3 -c "
+apptainer exec "$CONTAINER" python3 -c "
 import pandas as pd
 df = pd.read_csv('$MANIFEST')
 print(f'  Total samples: {len(df)}')
 print(f'  Variant types: {df[\"variant_type\"].value_counts().to_dict()}')
-print(f'  Duration values: {sorted(df[\"duration_ms\"].dropna().unique().tolist())}')
-print(f'  SNR values: {sorted(df[\"snr_db\"].dropna().unique().tolist())}')
-print(f'  T60 values: {sorted(df[\"T60\"].dropna().unique().tolist())}')
-print(f'  Filter values: {sorted(df[\"band_filter\"].dropna().unique().tolist())}')
 "
 
 echo ""

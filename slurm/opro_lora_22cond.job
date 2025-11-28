@@ -60,7 +60,7 @@ echo "[INFO] Samples in manifest: $(wc -l < "$MANIFEST")"
 
 # Show dataset structure
 echo "[INFO] Dataset structure:"
-python3 -c "
+apptainer exec "$CONTAINER" python3 -c "
 import pandas as pd
 df = pd.read_csv('$MANIFEST')
 print(f'  Total samples: {len(df)}')
