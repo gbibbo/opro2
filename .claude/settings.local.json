@@ -67,7 +67,10 @@
       "Bash(git stash:*)",
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(ssh:*)",
+      "Bash(rsync:*)",
+      "Bash(scp:*)"
     ],
     "deny": [],
     "ask": []

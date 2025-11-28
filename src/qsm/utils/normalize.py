@@ -20,11 +20,12 @@ def normalize_to_binary(
     Normalize model output to binary SPEECH/NONSPEECH label.
 
     Priority order (highest to lowest):
-    1. Exact match with verbalizers (SPEECH/NONSPEECH)
-    2. Letter mapping (A/B/C/D) via provided mapping dict
-    3. Yes/No responses
-    4. Synonyms (voice/talking vs music/noise/silence)
-    5. Unknown (returns None)
+    1. NONSPEECH/NON-SPEECH (checked first to avoid substring match with SPEECH)
+    2. SPEECH (only if NONSPEECH wasn't found)
+    3. Letter mapping (A/B/C/D) via provided mapping dict
+    4. Yes/No responses
+    5. Synonyms (voice/talking vs music/noise/silence)
+    6. Unknown (returns None)
 
     Semantic labels win over letters in ambiguous cases (e.g., "B) SPEECH" → SPEECH).
 
@@ -68,23 +69,25 @@ def normalize_to_binary(
         if "p_first_token" in probs:
             confidence = probs["p_first_token"]
 
-    # Priority 1: Exact match with verbalizers (highest priority)
-    for verb in verbalizers:
-        if verb.upper() in text_clean:
-            # Check it's not negated
-            if "NOT " + verb.upper() in text_clean or "NO " + verb.upper() in text_clean:
-                continue
-            # Semantic label wins over letter
-            if verb.upper() == "SPEECH":
-                return "SPEECH", confidence
-            elif (
-                verb.upper() == "NONSPEECH"
-                or "NON-SPEECH" in text_clean
-                or "NO SPEECH" in text_clean
-            ):
-                return "NONSPEECH", confidence
+    # Priority 1: Check for NONSPEECH/NON-SPEECH FIRST (before SPEECH)
+    # This avoids the substring bug where "NONSPEECH" contains "SPEECH"
+    if (
+        "NONSPEECH" in text_clean
+        or "NON-SPEECH" in text_clean
+        or "NON SPEECH" in text_clean
+        or "NO SPEECH" in text_clean
+    ):
+        # Make sure it's not double-negated like "NOT NONSPEECH"
+        if "NOT NONSPEECH" not in text_clean and "NOT NON-SPEECH" not in text_clean:
+            return "NONSPEECH", confidence
 
-    # Priority 2: Letter mapping (A/B/C/D)
+    # Priority 2: Exact match with SPEECH (only if NONSPEECH wasn't found)
+    if "SPEECH" in text_clean:
+        # Check it's not negated
+        if "NOT SPEECH" not in text_clean:
+            return "SPEECH", confidence
+
+    # Priority 3: Letter mapping (A/B/C/D)
     if mapping:
         # Extract first letter from response
         letter_match = re.match(r"^([A-D])", text_clean)
@@ -97,7 +100,7 @@ def normalize_to_binary(
                     confidence = probs[letter]
                 return label, confidence
 
-    # Priority 3: Yes/No responses
+    # Priority 4: Yes/No responses
     yes_patterns = ["YES", "SÍ", "SI", "AFFIRMATIVE", "TRUE", "CORRECT", "PRESENT"]
     no_patterns = ["NO", "NEGATIVE", "FALSE", "INCORRECT", "ABSENT", "NOT PRESENT"]
 
@@ -109,7 +112,7 @@ def normalize_to_binary(
         if pattern in text_clean:
             return "NONSPEECH", confidence * 0.95
 
-    # Priority 4: Synonyms and semantic content
+    # Priority 5: Synonyms and semantic content
     speech_synonyms = [
         "voice",
         "voices",
@@ -172,7 +175,7 @@ def normalize_to_binary(
     elif nonspeech_score > speech_score:
         return "NONSPEECH", confidence * 0.8
 
-    # Priority 5: Unknown/unparseable
+    # Priority 6: Unknown/unparseable
     return None, 0.0
 
 
