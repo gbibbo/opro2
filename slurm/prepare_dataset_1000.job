@@ -1,0 +1,74 @@
+#!/bin/bash
+#SBATCH --job-name=prep_data
+#SBATCH --partition=3090
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/prep_data_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/prep_data_%j.err
+
+# =============================================================================
+# Prepare 1000 validated base clips:
+#   - 500 SPEECH (VoxConverse, validated with Silero VAD >= 80%)
+#   - 500 NONSPEECH (ESC-50)
+#   - Dev: ~30 clips (3%) for OPRO
+#   - Test: ~970 clips (97%) for final evaluation
+# =============================================================================
+
+set -euo pipefail
+set -x
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+
+echo "[INFO] Start: $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv
+cd "$REPO"
+
+# Step 1: Prepare validated base clips
+echo ""
+echo "=========================================="
+echo "STEP 1: Prepare 1000 validated base clips"
+echo "=========================================="
+
+apptainer exec --nv \
+  --pwd "$REPO" \
+  "$CONTAINER" python3 scripts/prepare_validated_clips.py \
+  --voxconverse_dir data/raw/voxconverse/audio/dev \
+  --esc50_dir data/raw/esc50/audio \
+  --output_dir data/processed/base_validated_1000 \
+  --n_speech 500 \
+  --n_nonspeech 500 \
+  --dev_ratio 0.03 \
+  --seed 42
+
+# Step 2: Generate 22 variants per clip
+echo ""
+echo "=========================================="
+echo "STEP 2: Generate 22 variants per clip"
+echo "=========================================="
+
+apptainer exec --nv \
+  --pwd "$REPO" \
+  "$CONTAINER" python3 scripts/generate_experimental_variants.py \
+  --input_base data/processed/base_validated_1000 \
+  --output_dir data/processed/variants_validated_1000 \
+  --rir_dir data/raw/rirs \
+  --target_sr 16000
+
+# Summary
+echo ""
+echo "=========================================="
+echo "SUMMARY"
+echo "=========================================="
+echo "Base clips: 1000 (500 speech + 500 nonspeech)"
+echo "  - Dev: ~30 clips (3%)"
+echo "  - Test: ~970 clips (97%)"
+echo ""
+echo "With 22 variants each:"
+echo "  - Dev: ~660 samples for OPRO"
+echo "  - Test: ~21,340 samples for evaluation"
+
+echo ""
+echo "[DONE] End: $(date)"
