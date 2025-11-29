@@ -1,0 +1,68 @@
+#!/bin/bash
+#SBATCH --job-name=gen_data
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=04:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/gen_dataset_1000_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/gen_dataset_1000_%j.err
+
+# =============================================================================
+# Generate dataset with 1000 base clips:
+#   - Dev: 30 clips (15 speech + 15 nonspeech) for OPRO
+#   - Test: 970 clips (485 speech + 485 nonspeech) for evaluation
+#   - Each clip: 1000ms, no noise, no filters
+#   - Then generate 22 variants per clip
+# =============================================================================
+
+set -euo pipefail
+set -x
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+
+echo "[INFO] Start: $(date)"
+cd "$REPO"
+
+# Step 1: Prepare base clips (1000 clips: 30 dev + 970 test)
+echo ""
+echo "=========================================="
+echo "STEP 1: Prepare base 1000ms clips"
+echo "=========================================="
+
+apptainer exec \
+  --pwd "$REPO" \
+  "$CONTAINER" python3 scripts/prepare_base_clips.py \
+  --voxconverse_dir data/raw/voxconverse/audio/dev \
+  --esc50_dir data/raw/esc50/audio \
+  --output_dir data/processed/base_1000ms_final \
+  --duration 1000 \
+  --train_size 0 \
+  --dev_size 30 \
+  --test_size 970 \
+  --target_sr 16000 \
+  --seed 42
+
+echo ""
+echo "=========================================="
+echo "STEP 2: Generate 22 variants per clip"
+echo "=========================================="
+
+apptainer exec \
+  --pwd "$REPO" \
+  "$CONTAINER" python3 scripts/generate_experimental_variants.py \
+  --input_base data/processed/base_1000ms_final \
+  --output_dir data/processed/variants_1000clips \
+  --rir_dir data/raw/rirs \
+  --target_sr 16000
+
+echo ""
+echo "=========================================="
+echo "SUMMARY"
+echo "=========================================="
+echo "Dev clips: 30 × 22 = 660 samples"
+echo "Test clips: 970 × 22 = 21,340 samples"
+echo "Total: 1000 × 22 = 22,000 samples"
+
+echo ""
+echo "[DONE] End: $(date)"

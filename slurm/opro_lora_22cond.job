@@ -46,7 +46,7 @@ if [ ! -d "$CHECKPOINT" ]; then
 fi
 
 # Use 22-condition dataset
-MANIFEST="$REPO/data/processed/experimental_variants_large/dev_metadata.csv"
+MANIFEST="$REPO/data/processed/variants_validated_1000/dev_metadata.csv"
 if [ ! -f "$MANIFEST" ]; then
     echo "[ERROR] Manifest not found: $MANIFEST"
     echo "[ERROR] Run 'sbatch slurm/prepare_data_large.job' first"
