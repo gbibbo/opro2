@@ -1,0 +1,69 @@
+#!/bin/bash
+#SBATCH --job-name=eval_simple
+#SBATCH --partition=3090
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48G
+#SBATCH --time=02:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/eval_simple_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/eval_simple_%j.err
+
+# =============================================================================
+# Simple evaluation script
+# Usage: sbatch eval_simple.job <split> <model_type>
+#   split: dev or test
+#   model_type: base or lora
+# =============================================================================
+
+set -euo pipefail
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+SPLIT="${1:-dev}"
+MODEL="${2:-base}"
+
+echo "[INFO] Start: $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv
+cd "$REPO"
+
+export HF_HOME="/mnt/fast/nobackup/users/gb0048/.cache/huggingface"
+export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+export HF_HUB_CACHE="$HF_HOME/hub"
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
+MANIFEST="$REPO/data/processed/experimental_variants_large/${SPLIT}_metadata.csv"
+
+# Best prompts from OPRO
+PROMPT_BASE="Listen closely, is this very short clip human speech or noise? Answer only: SPEECH or NON-SPEECH."
+PROMPT_LORA="Does this very short clip contain human speech? Answer clearly: SPEECH or NON-SPEECH."
+
+if [ "$MODEL" == "lora" ]; then
+    CHECKPOINT="$REPO/checkpoints/qwen_lora_large_seed42/final"
+    PROMPT="$PROMPT_LORA"
+    OUTPUT_DIR="$REPO/results/eval_simple_lora_${SPLIT}"
+    CHECKPOINT_ARG="--checkpoint $CHECKPOINT"
+else
+    PROMPT="$PROMPT_BASE"
+    OUTPUT_DIR="$REPO/results/eval_simple_base_${SPLIT}"
+    CHECKPOINT_ARG=""
+fi
+
+echo "[INFO] Split: $SPLIT"
+echo "[INFO] Model: $MODEL"
+echo "[INFO] Prompt: $PROMPT"
+echo "[INFO] Output: $OUTPUT_DIR"
+
+apptainer exec --nv \
+  --pwd "$REPO" \
+  --env HF_HOME="$HF_HOME" \
+  --env TRANSFORMERS_CACHE="$TRANSFORMERS_CACHE" \
+  --env HF_HUB_CACHE="$HF_HUB_CACHE" \
+  --env PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+  "$CONTAINER" python3 scripts/evaluate_simple.py \
+  --manifest "$MANIFEST" \
+  --prompt "$PROMPT" \
+  --output_dir "$OUTPUT_DIR" \
+  --batch_size 50 \
+  $CHECKPOINT_ARG
+
+echo "[DONE] End: $(date)"
