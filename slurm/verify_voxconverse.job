@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --job-name=verify_vox
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=00:30:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/verify_vox_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/verify_vox_%j.err
+
+set -euo pipefail
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+
+echo "[INFO] Start: $(date)"
+cd "$REPO"
+
+apptainer exec "$CONTAINER" python3 scripts/verify_voxconverse.py
+
+echo "[DONE] End: $(date)"
