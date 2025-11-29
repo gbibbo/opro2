@@ -36,7 +36,7 @@ apptainer exec --nv \
   "$CONTAINER" python3 scripts/generate_experimental_variants.py \
   --input_base data/processed/base_validated_1000 \
   --output_dir data/processed/variants_validated_1000 \
-  --rir_dir data/rirs \
+  --rir_dir data/rirs/RIRS_NOISES \
   --rir_metadata data/rirs/rir_metadata.json \
   --target_sr 16000
 
