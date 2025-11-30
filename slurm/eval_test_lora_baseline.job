@@ -1,0 +1,78 @@
+#!/bin/bash
+#SBATCH --job-name=eval_l_bl
+#SBATCH --partition=3090
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48G
+#SBATCH --time=08:00:00
+#SBATCH --output=/mnt/fast/nobackup/users/gb0048/opro2/logs/eval_test_lora_baseline_%j.out
+#SBATCH --error=/mnt/fast/nobackup/users/gb0048/opro2/logs/eval_test_lora_baseline_%j.err
+
+# =============================================================================
+# PURPOSE: Final evaluation of LoRA model on TEST set with BASELINE prompt
+# =============================================================================
+# Uses:
+#   - LoRA checkpoint: checkpoints/qwen_lora_large_seed42/final
+#   - ALL 21,340 test samples (970 base clips x 22 conditions)
+#   - BASELINE prompt (NOT OPRO-optimized)
+# =============================================================================
+
+set -euo pipefail
+set -x
+
+REPO="/mnt/fast/nobackup/users/gb0048/opro2"
+CONTAINER="$REPO/qwen_pipeline_v2.sif"
+
+echo "[INFO] Start: $(date)"
+nvidia-smi --query-gpu=name,memory.total --format=csv
+cd "$REPO"
+
+export HF_HOME="/mnt/fast/nobackup/users/gb0048/.cache/huggingface"
+export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+export HF_HUB_CACHE="$HF_HOME/hub"
+mkdir -p "$HF_HOME" "$TRANSFORMERS_CACHE" "$HF_HUB_CACHE"
+
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
+
+# Verify checkpoint exists
+CHECKPOINT="$REPO/checkpoints/qwen_lora_large_seed42/final"
+if [ ! -d "$CHECKPOINT" ]; then
+    echo "[ERROR] LoRA checkpoint not found: $CHECKPOINT"
+    exit 1
+fi
+
+# Test manifest (970 base clips x 22 conditions = 21,340 samples)
+MANIFEST="$REPO/data/processed/variants_validated_1000/test_metadata.csv"
+if [ ! -f "$MANIFEST" ]; then
+    echo "[ERROR] Manifest not found: $MANIFEST"
+    exit 1
+fi
+
+NSAMPLES=$(($(wc -l < "$MANIFEST") - 1))
+echo "[INFO] Checkpoint: $CHECKPOINT"
+echo "[INFO] Manifest: $MANIFEST"
+echo "[INFO] Total samples: $NSAMPLES"
+
+# BASELINE prompt (used before OPRO optimization)
+BASELINE_PROMPT="Does this audio contain human speech?
+Reply with ONLY one word: SPEECH or NON-SPEECH."
+
+echo "[INFO] Prompt (BASELINE): $BASELINE_PROMPT"
+
+echo ""
+echo "[RUN] Final evaluation of LoRA model on test set with BASELINE prompt ($NSAMPLES samples)"
+apptainer exec --nv \
+  --pwd "$REPO" \
+  --env HF_HOME="$HF_HOME" \
+  --env TRANSFORMERS_CACHE="$TRANSFORMERS_CACHE" \
+  --env HF_HUB_CACHE="$HF_HUB_CACHE" \
+  --env PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" \
+  "$CONTAINER" python3 scripts/evaluate_simple.py \
+  --manifest "$MANIFEST" \
+  --prompt "$BASELINE_PROMPT" \
+  --output_dir "results/eval_test_lora_baseline" \
+  --checkpoint "$CHECKPOINT" \
+  --batch_size 50
+
+echo "[DONE] End: $(date)"
+echo "Results: results/eval_test_lora_baseline/"
