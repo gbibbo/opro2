@@ -19,7 +19,7 @@ from tqdm import tqdm
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.qsm.models.qwen2_audio import Qwen2AudioClassifier
+from src.qsm.models.qwen_audio import Qwen2AudioClassifier
 from src.qsm.utils.normalize import normalize_to_binary
 
 
