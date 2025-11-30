@@ -15,6 +15,7 @@ from collections import defaultdict
 import pandas as pd
 import torch
 from tqdm import tqdm
+from peft import PeftModel
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -220,7 +221,8 @@ def main():
 
     if args.checkpoint:
         print(f"  Loading LoRA checkpoint: {args.checkpoint}")
-        model.load_lora(args.checkpoint)
+        model.model = PeftModel.from_pretrained(model.model, args.checkpoint)
+        model.model.eval()
         print("  LoRA loaded!")
 
     # Evaluate
