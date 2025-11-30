@@ -64,6 +64,9 @@ def evaluate_samples(model, samples_df, prompt, batch_size=50):
     """
     results = []
 
+    # Set the prompt once
+    model.user_prompt = prompt
+
     # Process in batches
     total = len(samples_df)
     for start_idx in tqdm(range(0, total, batch_size), desc="Evaluating"):
@@ -81,7 +84,8 @@ def evaluate_samples(model, samples_df, prompt, batch_size=50):
 
             try:
                 # Get model prediction
-                response = model.classify(audio_path, prompt)
+                result = model.predict(audio_path, return_scores=True)
+                response = result.get("prediction", "") if isinstance(result, dict) else str(result)
                 prediction, _ = normalize_to_binary(response)
 
                 if prediction is None:
